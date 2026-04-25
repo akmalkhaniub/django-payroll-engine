@@ -1,0 +1,98 @@
+version: "3.9"
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: payroll_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: payroll_db
+      MYSQL_USER: payroll_user
+      MYSQL_PASSWORD: password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-ppassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: payroll_redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: payroll_api
+    command: gunicorn payroll_engine.wsgi:application --bind 0.0.0.0:8000 --workers 4
+    environment:
+      MYSQL_DATABASE: payroll_db
+      MYSQL_USER: payroll_user
+      MYSQL_PASSWORD: password
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-django-insecure-dev-key}
+      DEBUG: "True"
+    ports:
+      - "8000:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./media:/app/media
+
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: payroll_celery_worker
+    command: celery -A payroll_engine worker --loglevel=info --concurrency=4
+    environment:
+      MYSQL_DATABASE: payroll_db
+      MYSQL_USER: payroll_user
+      MYSQL_PASSWORD: password
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-django-insecure-dev-key}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./media:/app/media
+
+  celery_beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: payroll_celery_beat
+    command: celery -A payroll_engine beat --loglevel=info
+    environment:
+      MYSQL_DATABASE: payroll_db
+      MYSQL_USER: payroll_user
+      MYSQL_PASSWORD: password
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-django-insecure-dev-key}
+    depends_on:
+      - redis
+
+volumes:
+  mysql_data:
