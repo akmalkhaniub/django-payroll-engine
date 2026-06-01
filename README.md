@@ -3,6 +3,8 @@
 > **Portfolio Project 2** — Targeting the Senior Python Django GCP Engineer role  
 > Tech: Python · Django REST Framework · Celery · Redis · MySQL · Docker · ReportLab
 
+A high-throughput asynchronous payroll processing system designed to handle complex payroll calculations, timesheet approvals, and PDF invoice generation. By offloading CPU-intensive PDF rendering to background Celery workers, it achieves low-latency API response times and ensures strict database transaction integrity (ACID) for financial compliance.
+
 ---
 
 ## 🎯 What This Project Demonstrates
